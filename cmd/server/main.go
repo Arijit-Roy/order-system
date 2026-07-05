@@ -1,0 +1,45 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net"
+	"time"
+
+	orderspb "order-system/grpc"
+	"order-system/internal/repository"
+	"order-system/internal/service"
+	grpctransport "order-system/internal/transport/grpc"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	grpcserver "google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+)
+
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, "postgres://orderuser:orderpass@localhost:5432/ordersdb")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Close()
+
+	repo := repository.NewPostgresRepo(pool)
+	svc := service.NewOrderService(repo)
+
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	grpcSrv := grpcserver.NewServer()
+	orderspb.RegisterOrderServiceServer(grpcSrv, grpctransport.NewOrderGRPCServer(svc))
+	reflection.Register(grpcSrv)
+
+	log.Println("gRPC server listening on :50051")
+	if err := grpcSrv.Serve(lis); err != nil {
+		log.Fatal(err)
+	}
+}
