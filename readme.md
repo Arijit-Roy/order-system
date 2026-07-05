@@ -344,7 +344,7 @@ Run the publisher (work in progress):
 go run ./cmd/publisher
 ```
 
----
+--- 
 
 # Learning Goals
 
