@@ -3,18 +3,18 @@ package domain
 import "encoding/json"
 
 type Order struct {
-	ID string
-	CustomerID string
-	ProductID string
-	Quantity int
-	Amount float64
+	ID         string  `json:"id"`
+	CustomerID string  `json:"customer_id"`
+	ProductID  string  `json:"product_id"`
+	Quantity   int     `json:"quantity"`
+	Amount     float64 `json:"amount"`
 }
 
 type OutboxEvent struct {
-    ID            string
-    AggregateType string
-    AggregateID   string
-    EventType     string
-    Payload       json.RawMessage
-    Status        string
+	ID            string
+	AggregateType string
+	AggregateID   string
+	EventType     string
+	Payload       json.RawMessage
+	Status        string
 }

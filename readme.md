@@ -2,97 +2,86 @@
 
 ## Overview
 
-This project is a learning-oriented implementation of a modern backend system written in Go.
+**Order System** is a learning-oriented project that demonstrates how to design and build a modern cloud-native backend using Go.
 
-Rather than focusing only on language features, the project gradually evolves from a simple CRUD application into a cloud-native, event-driven architecture. Every technology is introduced only when the architecture requires it.
+Instead of introducing technologies independently, every new component is added only when the architecture requires it. The project starts as a simple CRUD application and gradually evolves into a distributed event-driven system composed of multiple services communicating through gRPC and Redis Streams.
 
-The project currently demonstrates:
-
-* Go project organization
-* Dependency Injection
-* Repository Pattern
-* PostgreSQL with `pgx`
-* Integration testing
-* Docker & Docker Compose
-* gRPC with Protocol Buffers
-* Transport Adapters
-* Outbox Pattern
-* Redis integration (work in progress)
-
-Future topics include:
-
-* Redis Streams
-* Event-Driven Architecture
-* Consumer Groups
-* Kubernetes
-* Skaffold
-* Bazel
+The objective of this repository is not simply to build an Order Management System, but to understand **why modern backend architectures are designed the way they are.**
 
 ---
 
 # Architecture
 
-Current synchronous request flow:
-
 ```text
-Client
-   │
-   │ gRPC
-   ▼
-OrderGRPCServer
-   │
-   ▼
-OrderService
-   │
-   ▼
-OrderRepository
-   │
-   ▼
-PostgreSQL
+                    Client
+                       │
+                     gRPC
+                       │
+                       ▼
+                Order Service
+                       │
+          PostgreSQL (ordersdb)
+                │         │
+                ▼         ▼
+             orders    outbox_events
+                       │
+                       ▼
+                   Publisher
+                       │
+                       ▼
+             Redis Stream (stream:orders)
+                  ┌──────────────┐
+                  ▼              ▼
+          Notification      Inventory
+                                │
+                     PostgreSQL (inventorydb)
+                          │              │
+                          ▼              ▼
+                      orders       outbox_events
+                                        │
+                                        ▼
+                                   Publisher
+                                        │
+                                        ▼
+                          Redis Stream (stream:inventory)
+                                        │
+                                        ▼
+                                    Shipping
 ```
 
-Current persistence flow:
+---
 
-```text
-CreateOrder()
+# Features
 
-↓
+- gRPC API
+- PostgreSQL persistence
+- Repository Pattern
+- Dependency Injection
+- Transport Adapter Pattern
+- Outbox Pattern
+- Redis Streams
+- Consumer Groups
+- Event-driven communication
+- CQRS-style read model
+- Docker multi-stage builds
+- Docker Compose orchestration
+- Health checks
+- Environment-based configuration
 
-BEGIN TRANSACTION
+---
 
-↓
+# Technology Stack
 
-Insert Order
-
-↓
-
-Insert Outbox Event
-
-↓
-
-COMMIT
-```
-
-Planned event flow:
-
-```text
-PostgreSQL Outbox
-
-↓
-
-Publisher
-
-↓
-
-Redis Stream
-
-↓
-
-Notification
-Inventory
-Analytics
-Fraud Detection
-```
+| Technology | Purpose |
+|------------|---------|
+| Go | Backend services |
+| PostgreSQL | Persistent storage |
+| pgx | PostgreSQL driver |
+| Redis Streams | Event streaming |
+| gRPC | Service communication |
+| Protocol Buffers | API contracts |
+| Docker | Containerization |
+| Docker Compose | Local orchestration |
 
 ---
 
@@ -100,100 +89,115 @@ Fraud Detection
 
 ```text
 cmd/
-    client/
-    server/
-    publisher/
+├── client/
+├── server/
+├── publisher/
+├── notification/
+├── inventory/
+└── shipping/
 
 grpc/
-    order.proto
-    order.pb.go
-    order_grpc.pb.go
+├── order.proto
+├── order.pb.go
+└── order_grpc.pb.go
 
 internal/
-
-    domain/
-
-    repository/
-
-    service/
-
-    transport/
-        grpc/
-
-    redis/
+├── config/
+├── domain/
+├── inventory/
+├── notification/
+├── publisher/
+├── redis/
+├── repository/
+├── service/
+└── transport/
 ```
 
-## Folder Responsibilities
+---
 
-### `cmd/`
+# Folder Responsibilities
 
-Contains runnable executables.
+## cmd/
 
-* `server` – gRPC server
-* `client` – example gRPC client
-* `publisher` – publishes Outbox events
+Contains all runnable applications.
 
-### `internal/domain`
+| Folder | Responsibility |
+|---------|----------------|
+| server | Order gRPC Server |
+| client | Sample gRPC Client |
+| publisher | Publishes Outbox events |
+| notification | Consumes Order events |
+| inventory | Reserves inventory |
+| shipping | Consumes Inventory events |
 
-Business entities and domain concepts.
+---
+
+## internal/domain
+
+Contains business entities and domain concepts.
 
 Examples:
 
-* Order
-* OutboxEvent
-* Domain errors
+- Order
+- OutboxEvent
+- InventoryEvent
+- Domain Errors
 
-This package should not know about:
+The domain layer knows nothing about:
 
-* gRPC
-* PostgreSQL
-* Redis
+- PostgreSQL
+- Redis
+- gRPC
+- Protocol Buffers
 
 ---
 
-### `internal/service`
+## internal/service
 
-Business logic.
+Contains business logic.
 
 Responsible for:
 
-* validation
-* orchestration
-* creating business events
+- Validation
+- Business rules
+- Event creation
+- Orchestration
 
-Should not contain:
-
-* SQL
-* protobuf
-* Redis commands
+The service layer never performs SQL or transport-specific operations.
 
 ---
 
-### `internal/repository`
+## internal/repository
 
 Persistence layer.
 
 Responsible for:
 
-* SQL
-* transactions
-* PostgreSQL
+- SQL
+- Transactions
+- PostgreSQL
+- Outbox persistence
 
-Owns persistence concerns.
+Repositories expose business operations rather than CRUD methods.
+
+Examples:
+
+- `CreateOrder()`
+- `ReserveInventory()`
+
+instead of generic CRUD methods.
 
 ---
 
-### `internal/transport/grpc`
+## internal/transport
 
-Transport Adapter.
+Transport adapters.
 
 Responsible for converting:
 
 ```text
 protobuf
-
-↓
-
+    ↓
 domain
 ```
 
@@ -201,135 +205,171 @@ and
 
 ```text
 domain
-
-↓
-
+    ↓
 protobuf
 ```
 
-The transport layer should never leak into the business layer.
+The business layer remains transport-independent.
 
 ---
 
-### `grpc/`
+## internal/publisher
 
-Contains the Protocol Buffer contract and generated code.
+Generic Outbox Publisher.
 
-The `.proto` file is the API contract between client and server.
+Responsibilities:
 
----
+- Poll pending events
+- Publish to Redis Streams
+- Mark events as published
 
-# Technology Stack
-
-* Go
-* PostgreSQL
-* pgx
-* Docker
-* gRPC
-* Protocol Buffers
-* Redis (in progress)
+The same publisher implementation is reused by multiple services.
 
 ---
 
-# Design Principles
+## internal/redis
 
-This project follows a few core principles.
+Redis abstraction.
 
-## Separation of Concerns
+Provides:
 
-Each layer owns exactly one responsibility.
+- Stream publishing
+- Consumer Groups
+- Message acknowledgement
+- Group creation
+
+---
+
+## internal/config
+
+Application configuration.
+
+Loads configuration from environment variables.
+
+Supports both:
+
+- Local development
+- Docker Compose
+- Kubernetes
+
+without changing application code.
+
+---
+
+# Event Flow
+
+## Order Creation
 
 ```text
-Transport
-
-↓
-
-Business
-
-↓
-
-Persistence
+Client
+    │
+    ▼
+gRPC
+    │
+    ▼
+Order Service
+    │
+    ▼
+BEGIN
+    │
+    ▼
+Insert Order
+    │
+    ▼
+Insert Outbox Event
+    │
+    ▼
+COMMIT
 ```
 
 ---
 
-## Depend on Abstractions
-
-Services depend on interfaces, not concrete implementations.
-
-Example:
-
-```go
-OrderService
-    ↓
-OrderRepository
-```
-
-instead of:
-
-```go
-OrderService
-    ↓
-PostgresOrderRepository
-```
-
----
-
-## Domain Independence
-
-Business objects remain independent of transport.
+## Event Publication
 
 ```text
-orderspb.Order
-
-↓
-
-Transport Adapter
-
-↓
-
-domain.Order
+Outbox
+   │
+   ▼
+Publisher
+   │
+   ▼
+Redis Stream
 ```
 
-Changing gRPC to another communication technology should not affect the business layer.
+---
+
+## Inventory Processing
+
+```text
+OrderCreated
+      │
+      ▼
+Inventory
+      │
+      ▼
+Reserve Stock
+      │
+      ▼
+Update Projection
+      │
+      ▼
+Insert Inventory Outbox
+      │
+      ▼
+COMMIT
+```
 
 ---
 
-## Transaction Ownership
+## Shipping
 
-Repositories own database transactions.
-
-Services express business operations.
-
----
-
-## Reliable Event Publication
-
-The project implements the Outbox Pattern.
-
-Business operations write both:
-
-* the Order
-* the Outbox Event
-
-inside the same database transaction.
-
-A separate publisher later distributes those events.
+```text
+InventoryReserved
+        │
+        ▼
+Shipping
+```
 
 ---
 
 # Running the Project
 
+## Using Docker Compose (Recommended)
+
+```bash
+docker compose up --build
+```
+
+This command:
+
+- Builds all application images
+- Starts PostgreSQL
+- Starts Redis
+- Initializes databases
+- Starts Order Service
+- Starts Publisher
+- Starts Notification
+- Starts Inventory
+- Starts Shipping
+
+---
+
+## Local Development
+
 Start infrastructure:
 
 ```bash
-docker compose up -d
+docker compose up postgres redis
 ```
 
-Run the server:
+Run services individually:
 
 ```bash
 go run ./cmd/server
+go run ./cmd/publisher
+go run ./cmd/notification
+go run ./cmd/inventory
+go run ./cmd/shipping
 ```
 
 Run the client:
@@ -338,52 +378,208 @@ Run the client:
 go run ./cmd/client
 ```
 
-Run the publisher (work in progress):
+---
 
-```bash
-go run ./cmd/publisher
+# Configuration
+
+The application is configured through environment variables.
+
+| Variable | Description |
+|----------|-------------|
+| DB_HOST | PostgreSQL host |
+| DB_PORT | PostgreSQL port |
+| DB_USER | PostgreSQL user |
+| DB_PASSWORD | PostgreSQL password |
+| DB_NAME | Database name |
+| REDIS_ADDR | Redis server |
+| ORDER_SERVER_ADDR | Order Service gRPC endpoint |
+
+The same binaries work:
+
+- Local development
+- Docker Compose
+- Kubernetes
+
+Only the environment changes.
+
+---
+
+# Design Patterns
+
+## Repository Pattern
+
+Repositories expose business operations instead of CRUD methods.
+
+---
+
+## Dependency Injection
+
+Services depend on abstractions rather than concrete implementations.
+
+---
+
+## Transport Adapter
+
+Transport-specific models never leak into the business layer.
+
+---
+
+## Outbox Pattern
+
+Business data and events are written within the same transaction, ensuring reliable event publication.
+
+---
+
+## CQRS
+
+Inventory maintains its own read model rather than querying the Order Service directly.
+
+---
+
+## Event-Driven Architecture
+
+Services communicate asynchronously using Redis Streams.
+
+---
+
+## Consumer Groups
+
+Multiple services independently consume the same stream while maintaining their own processing state.
+
+---
+
+# Docker Concepts
+
+This project demonstrates several Docker concepts.
+
+## Multi-stage Builds
+
+A single reusable Dockerfile builds every service using a build argument.
+
+```dockerfile
+ARG SERVICE
 ```
 
---- 
+---
 
-# Learning Goals
+## Distroless Runtime Images
 
-This repository is intentionally educational.
+The runtime image contains only the compiled Go binary.
 
-The objective is to understand:
+No compiler.
 
-* why repositories exist
-* why transport adapters exist
-* why protobuf models differ from domain models
-* why distributed systems require asynchronous communication
-* why the Outbox Pattern exists
-* why Redis Streams solve a different problem than queues
+No source code.
 
-Every architectural decision in this repository is intended to answer a "why" question rather than simply demonstrate a framework.
+No package manager.
+
+---
+
+## Docker Compose
+
+Compose orchestrates:
+
+- PostgreSQL
+- Redis
+- Order Service
+- Publisher
+- Notification
+- Inventory
+- Shipping
+
+---
+
+## Service Discovery
+
+Containers communicate using Docker service names.
+
+Examples:
+
+- `postgres`
+- `redis`
+- `order-server`
+
+instead of `localhost`.
+
+---
+
+## Health Checks
+
+Docker waits until PostgreSQL and Redis are healthy before starting dependent services.
+
+---
+
+## Environment-based Configuration
+
+Applications load configuration from environment variables, allowing the same binaries to run in different environments without modification.
+
+---
+
+# Learning Objectives
+
+This repository demonstrates why modern backend systems adopt layered architecture and asynchronous communication.
+
+Topics covered include:
+
+- Project organization
+- Dependency Injection
+- Repository Pattern
+- PostgreSQL
+- Transactions
+- gRPC
+- Protocol Buffers
+- Transport Adapters
+- Outbox Pattern
+- Redis Streams
+- Consumer Groups
+- CQRS
+- Event-Driven Architecture
+- Docker
+- Docker Compose
+- Health Checks
+- Service Discovery
+
+Each technology is introduced to solve a concrete architectural problem rather than as an isolated concept.
 
 ---
 
 # Roadmap
 
-* [x] Go project structure
-* [x] Repository Pattern
-* [x] PostgreSQL
-* [x] Docker
-* [x] gRPC
-* [x] Outbox Pattern
-* [ ] Redis Streams
-* [ ] Consumer Groups
-* [ ] Event-Driven Architecture
-* [ ] Kubernetes
-* [ ] Skaffold
-* [ ] Bazel
+## Completed
+
+- ✅ Go Project Structure
+- ✅ Dependency Injection
+- ✅ Repository Pattern
+- ✅ PostgreSQL
+- ✅ Docker
+- ✅ Docker Compose
+- ✅ gRPC
+- ✅ Protocol Buffers
+- ✅ Transport Adapters
+- ✅ Outbox Pattern
+- ✅ Redis Streams
+- ✅ Consumer Groups
+- ✅ Event-Driven Architecture
+- ✅ CQRS
+- ✅ Notification Service
+- ✅ Inventory Service
+- ✅ Shipping Service
+
+## Next
+
+- ⬜ Kubernetes
+- ⬜ Helm
+- ⬜ Prometheus
+- ⬜ Grafana
+- ⬜ OpenTelemetry
+- ⬜ Skaffold
+- ⬜ Bazel
 
 ---
 
 # Philosophy
 
-The goal of this project is not to build an Order Service.
+The purpose of this project is not to build an Order Management System.
 
-The goal is to build a realistic backend system while understanding the architectural reasoning behind every component.
+The purpose is to understand the architectural reasoning behind modern distributed systems.
 
-Every new technology should solve a problem introduced by the previous stage of the project.
+Every technology introduced in this repository solves a real architectural problem created by the previous stage of the application. The result is a gradual evolution from a simple CRUD application into a cloud-native, event-driven backend built with production-oriented design principles.

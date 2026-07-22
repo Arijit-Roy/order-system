@@ -7,15 +7,17 @@ import (
 	"time"
 
 	orderspb "order-system/grpc"
+	"order-system/internal/config"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
+	grpcAddr := config.Load().GRPCAddr
 	// Connect to the gRPC server as a separate process.
 	conn, err := grpc.NewClient(
-		"localhost:50051",
+		grpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -32,11 +34,11 @@ func main() {
 	// Call CreateOrder over the network.
 	createResp, err := client.CreateOrder(ctx, &orderspb.CreateOrderRequest{
 		Order: &orderspb.Order{
-			Id:         "ORD-201",
-			CustomerId: "CUST-200",
-			ProductId:  "PROD-200",
-			Quantity:   1,
-			Amount:     42.50,
+			Id:         "ORD-205",
+			CustomerId: "CUST-202",
+			ProductId:  "prod-200",
+			Quantity:   15,
+			Amount:     4560,
 		},
 	})
 	if err != nil {

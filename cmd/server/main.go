@@ -7,6 +7,7 @@ import (
 	"time"
 
 	orderspb "order-system/grpc"
+	"order-system/internal/config"
 	"order-system/internal/repository"
 	"order-system/internal/service"
 	grpctransport "order-system/internal/transport/grpc"
@@ -20,7 +21,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, "postgres://orderuser:orderpass@localhost:5432/ordersdb")
+	cfg := config.Load()
+	pgDSN := cfg.PostgresDSN()
+
+	pool, err := pgxpool.New(ctx, pgDSN)
 	if err != nil {
 		log.Fatal(err)
 	}
