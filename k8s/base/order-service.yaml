@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: order-server
+  template:
+    metadata:
+      labels:
+        app: order-server
+    spec:
+      containers: 
+        - name: order-server
+          image: order-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 50051
+          envFrom:
+              - configMapRef:
+                  name: order-config
+              - secretRef:
+                  name: order-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-server
+spec:
+  selector:
+    app: order-server
+  ports:
+    - protocol: TCP
+      port: 50051
+      targetPort: 50051
+
+
+---

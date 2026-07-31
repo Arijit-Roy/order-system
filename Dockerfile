@@ -4,6 +4,7 @@ COPY go.sum go.mod ./
 RUN go mod download
 COPY . .
 ARG SERVICE
+RUN test -n "$SERVICE" || (echo "SERVICE build arg is required" && exit 1)
 RUN CGO_ENABLED=0 GOOS=linux \
     go build -o app ./cmd/${SERVICE}
 

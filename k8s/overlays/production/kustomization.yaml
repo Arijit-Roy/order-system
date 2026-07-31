@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  # These are production-only resources
+  - ingress.yaml
+  - hpa.yaml
+  - networkpolicy.yaml
+
+patches:
+  - path: replicas-patch.yaml
+  - path: resources-patch.yaml
+
+images:
+  - name: order-server
+    newTag: v1.0.0
+
+  - name: order-system-publisher
+    newTag: v1.0.0
+
+  - name: order-system-inventory
+    newTag: v1.0.0
+
+  - name: order-system-notification
+    newTag: v1.0.0

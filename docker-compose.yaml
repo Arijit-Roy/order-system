@@ -2,6 +2,7 @@
 services:
   redis:
     image: redis:7
+    restart: unless-stopped
     # container_name: order-redis
     ports:
       - "6379:6379"
@@ -14,6 +15,7 @@ services:
       retries: 5
   postgres:
     image: postgres:16
+    restart: unless-stopped
     # container_name: order-postgres
     environment:
       POSTGRES_USER: orderuser
@@ -32,6 +34,7 @@ services:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
   order-server:
     image: order-server:latest
+    restart: unless-stopped
     build:
       context: .
       args:
@@ -51,7 +54,8 @@ services:
       redis:
         condition: service_healthy
   publisher:
-    image: order-system-publisher:latest 
+    image: order-system-publisher:latest
+    restart: unless-stopped
     build:
       context: .
       args:
@@ -71,6 +75,7 @@ services:
         condition: service_healthy
   inventory:
     image: order-system-inventory:latest
+    restart: unless-stopped
     build:
       context: .
       args:
@@ -96,6 +101,7 @@ services:
   #       SERVICE: client
   notification:
     image: order-system-notification:latest
+    restart: unless-stopped
     build:
       context: .
       args:
