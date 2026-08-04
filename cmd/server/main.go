@@ -15,6 +15,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	grpcserver "google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+
+	health "google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func main() {
@@ -39,8 +42,16 @@ func main() {
 	}
 
 	grpcSrv := grpcserver.NewServer()
+
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(grpcSrv, healthServer)
+
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
+
 	orderspb.RegisterOrderServiceServer(grpcSrv, grpctransport.NewOrderGRPCServer(svc))
 	reflection.Register(grpcSrv)
+
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 
 	log.Println("gRPC server listening on :50051")
 	if err := grpcSrv.Serve(lis); err != nil {

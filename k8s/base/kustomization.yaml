@@ -10,6 +10,7 @@ resources:
   - publisher.yaml
   - inventory.yaml
   - notification.yaml
+  - order-server-hpa.yaml
 
   - postgres/postgres-config.yaml
   - postgres/postgres-secret.yaml

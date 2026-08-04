@@ -7,7 +7,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
 spec:
-  ingressClassName: nginx
+  ingressClassName: nginx # Which Ingress Controller should process this resource?
   rules:
     - host: order.local
       http:
