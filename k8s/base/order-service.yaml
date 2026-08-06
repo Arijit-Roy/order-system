@@ -54,10 +54,18 @@ metadata:
 spec:
   selector:
     app: order-server
+  # ports:
+  #   - protocol: TCP
+  #     port: 50051
+  #     targetPort: 50051
+
+
   ports:
-    - protocol: TCP
-      port: 50051
-      targetPort: 50051
+  - name: grpc
+    port: 50051
+    targetPort: 50051
 
+  - name: metrics
+    port: 8080
+    targetPort: 8080
 
----

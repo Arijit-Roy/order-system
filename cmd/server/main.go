@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"time"
 
 	orderspb "order-system/grpc"
@@ -18,6 +19,9 @@ import (
 
 	health "google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"order-system/internal/metrics"
 )
 
 func main() {
@@ -36,12 +40,28 @@ func main() {
 	repo := repository.NewPostgresRepo(pool)
 	svc := service.NewOrderService(repo)
 
+	metrics.Register()
+
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	grpcSrv := grpcserver.NewServer()
+	grpcSrv := grpcserver.NewServer(
+		grpcserver.UnaryInterceptor(metrics.UnaryServerInterceptor()),
+	)
+
+	go func() {
+		mux := http.NewServeMux()
+
+		mux.Handle("/metrics", promhttp.Handler())
+
+		log.Println("Metrics server listening on :8080")
+
+		if err := http.ListenAndServe(":8080", mux); err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	healthServer := health.NewServer()
 	healthpb.RegisterHealthServer(grpcSrv, healthServer)
