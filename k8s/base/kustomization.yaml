@@ -18,3 +18,4 @@ resources:
   - postgres/postgres-pvc.yaml
   - postgres/postgres-deployment.yaml
   - postgres/postgres-init.yaml
+  - service-monitor.yaml
